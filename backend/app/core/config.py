@@ -34,10 +34,7 @@ class Settings(BaseSettings):
     STORAGE_ROOT: Path = Path("/var/lib/sfmp_vault")
 
     # Optional built frontend/website directory served by the backend for SPA routes.
-    WEBSITE_DIST_DIR: str | None = None
-
-    # Optional built frontend/website directory served by the backend for SPA routes.
-    # If unset, common locations (e.g. ../frontend/dist) are auto-detected.
+    # If unset, common locations (e.g. ../frontend/dist, /app/frontend/dist) are auto-detected.
     WEBSITE_DIST_DIR: Path | None = None
 
     # Size Limits & Quotas
@@ -76,6 +73,13 @@ class Settings(BaseSettings):
         except OSError:
             # Local development fallback outside the webroot.
             return Path(__file__).resolve().parents[3] / "storage_vault"
+
+    @field_validator("WEBSITE_DIST_DIR", mode="before")
+    @classmethod
+    def assemble_website_dist_dir(cls, v):
+        if v is None or v == "":
+            return None
+        return Path(v).expanduser().resolve()
 
 
 settings = Settings()

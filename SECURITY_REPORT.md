@@ -136,7 +136,7 @@ Without strict resource bounds, malicious or compromised accounts can exhaust se
 If uploaded files are stored inside a publicly served webroot or rendered inline by a browser, attackers can achieve Server-Side Code Execution (via misconfigured script interpreters) or Client-Side Stored XSS (via browser MIME sniffing or inline rendering of active content).
 
 ### Implemented Defense
-- **Strict Webroot Isolation:** The storage vault (`/var/lib/sfmp_vault`) is completely outside Nginx's static serving paths and FastAPI's `StaticFiles`. No direct URL maps to any uploaded file; every byte must flow through authenticated or token-authorized FastAPI streaming endpoints.
+- **Strict Webroot Isolation:** The storage vault (`/var/lib/sfmp_vault`) is completely outside Nginx's static serving paths and is never exposed by application static hosting. No direct URL maps to any uploaded file; every byte must flow through authenticated or token-authorized FastAPI streaming endpoints.
 - **Least-Privilege OS Permissions:** Uploaded files are created with mode `0640` (non-executable) owned by a dedicated unprivileged service user (`sfmp`, UID 10001). Vault directories use `0750`. The Docker storage volume is bind-mounted with `noexec,nosuid,nodev` where supported, and containers drop all Linux capabilities with `no-new-privileges` enabled.
 - **Defensive Download Response Headers:** Every file download enforces:
   - `Content-Disposition: attachment; filename="<sanitized>"; filename*=UTF-8''<encoded>` — forces browser download rather than inline execution/rendering.
@@ -148,5 +148,31 @@ If uploaded files are stored inside a publicly served webroot or rendered inline
 ### Verification
 - **Test Case:** Inspected physical file permissions on the storage volume (`ls -la`) and audited HTTP download headers via `curl -I`.
 - **Expected & Observed Result:** All stored files exhibited `-rw-r-----` permissions with zero execute bits; download responses consistently delivered `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, and `Content-Security-Policy: default-src 'none'; sandbox`.
+
+---
+
+## Website Frontend Delivery (SPA) — Implementation & Security Notes
+
+### Purpose
+The platform includes a React 18 + TypeScript (Vite + Tailwind) website frontend for authentication, Drive/workspace operations, sharing, public share access, and administration. In addition to Nginx-served deployments, the FastAPI backend can optionally serve the **built** frontend bundle for single-origin SPA delivery.
+
+### Frontend guide (summary)
+- **Source:** `frontend/src/` (routes, pages, components, API client, auth guards). Production build: `frontend/dist/` (gitignored).
+- **Local dev:** `cd frontend && npm ci && npm run dev` (Vite, typically `:5173`) against the backend API.
+- **Production build:** `cd frontend && npm ci && npm run build`.
+- **Deployment options:**
+  1. **Nginx + backend (Docker default):** Nginx serves the website and proxies `/api` to FastAPI.
+  2. **Backend-served SPA:** FastAPI serves a trusted built dist directory for non-API routes with SPA fallback to `index.html`, mounting `/assets` when present.
+
+### Backend SPA serving behavior
+- **Discovery:** `WEBSITE_DIST_DIR` setting (if provided) or auto-detected candidates: `<repo>/frontend/dist`, `<cwd>/frontend/dist`, `/app/frontend/dist` (only when `index.html` exists).
+- **Routing:** API routes remain under `/api/v1` (and system endpoints like `/health`, docs) and are not shadowed; SPA catch-all serves existing files within the resolved dist directory or falls back to `index.html`.
+- **Path safety:** Candidate files are resolved and must be within the website dist root (`is_relative_to`) before being served.
+
+### Security considerations
+- **Separation from uploads:** The website bundle directory is distinct from the isolated storage vault. User-uploaded objects are never exposed via SPA/static serving and remain accessible only through validated, authorized streaming download endpoints.
+- **Trusted bundle only:** Operators must point `WEBSITE_DIST_DIR` only at trusted build artifacts; serving arbitrary or writable directories would introduce content-injection risk. Build artifacts should be produced in CI or controlled environments.
+- **Headers/CSP:** FastAPI applies global security middleware (e.g. `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, strict default CSP for API hardening). Nginx applies its own configured headers for frontend/API locations in Docker deployments. Deployments should validate that SPA asset loading functions correctly under the effective CSP and adjust policy deliberately without weakening upload/download protections.
+- **No executable uploads:** This delivery path does not change Control #7 for stored files; vault permissions, `noexec` mounting, attachment-only downloads, `nosniff`, and sandboxed download CSP remain in effect.
 
 ---

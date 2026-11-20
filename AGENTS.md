@@ -87,3 +87,6 @@ Key capabilities:
 - **2026-11-20 11:30** — Initial analysis of `secure_file_management_platform_guide.md`.
 - **2026-11-20 11:45** — Environment discovery completed (Python 3.14, Node 22, Docker 29, Compose v5, Fedora 43, libmagic.so.1 present).
 - **2026-11-20 11:46** — Initialized `AGENTS.md` memory log. Commencing Phase 1.
+- **2026-11-20 12:20** — Completed roadmap commits 1-24 on `main`: DB/auth/folders/files/sharing/admin APIs, React UI (layout/explorer/sharing/admin), all 7 security controls with `SECURITY_REPORT.md` sections, automated security suite, and README/docs. Verification: backend security tests 23 passed (ASGI+SQLite, isolated temp vault) and frontend `npm run build` passed; Docker/Postgres/Redis unavailable locally.
+- **2026-11-20 12:40** — Pushed roadmap commits and added `f1c305b` `feat(website): serve built SPA from backend and add missing modal component` (backend SPA serving via `WEBSITE_DIST_DIR`/auto-detected `frontend/dist`, SPA fallback without shadowing `/api`, tracked `frontend/src/components/ui/Modal.tsx`).
+- **2026-11-20 13:00** — Updated markdown docs: added website frontend guide and SPA delivery/deployment/security notes to `README.md` and `SECURITY_REPORT.md`; cleaned `WEBSITE_DIST_DIR` config; updated `AGENTS.md`.
