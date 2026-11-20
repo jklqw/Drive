@@ -22,6 +22,7 @@ from app.services.file_validator import (
     verify_image_structure,
 )
 from app.services.storage_service import (
+    apply_directory_permissions,
     apply_file_permissions,
     delete_physical,
     new_storage_key,
@@ -108,7 +109,8 @@ async def upload_file(
             break
     else:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to allocate storage key")
-    target.parent.mkdir(parents=True, exist_ok=True)
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
+    apply_directory_permissions(target.parent)
     temporary = target.with_name(f".{storage_key}.part")
 
     digest = hashlib.sha256()

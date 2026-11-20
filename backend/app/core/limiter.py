@@ -23,7 +23,7 @@ def user_key(request: Request) -> str:
 limiter = Limiter(
     key_func=get_remote_address,
     storage_uri=settings.REDIS_URL,
-    headers_enabled=True,
+    headers_enabled=False,
     swallow_errors=True,
     in_memory_fallback_enabled=True,
 )

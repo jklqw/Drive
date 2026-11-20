@@ -21,9 +21,10 @@ def get_storage_root() -> Path:
     root = settings.STORAGE_ROOT.resolve()
     if root == Path(root.anchor):
         raise SecurityViolationError("Storage root cannot be a filesystem root")
-    root.mkdir(parents=True, exist_ok=True)
+    root.mkdir(parents=True, exist_ok=True, mode=0o750)
     if not root.is_dir():
         raise SecurityViolationError("Storage root is not a directory")
+    apply_directory_permissions(root)
     return root
 
 
@@ -45,6 +46,13 @@ def new_storage_key() -> str:
 
 async def delete_physical(storage_key: str) -> None:
     resolve_safe_path(storage_key).unlink(missing_ok=True)
+
+
+def apply_directory_permissions(path: Path) -> None:
+    """Vault directories are traversable only by the service group (0o750)."""
+    path.chmod(
+        stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP
+    )  # 0o750
 
 
 def apply_file_permissions(path: Path) -> None:

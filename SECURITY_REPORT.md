@@ -129,3 +129,24 @@ Without strict resource bounds, malicious or compromised accounts can exhaust se
 - **Expected & Observed Result:** (a) Rejected with `413 Payload Too Large` with zero residual temp files; (b) rejected with `413 Quota Exceeded` and a `QUOTA_EXCEEDED` audit entry; (c) requests beyond threshold returned `429 Too Many Requests` with a `Retry-After` header and a `RATE_LIMIT_EXCEEDED` audit entry.
 
 ---
+
+## 7. Preventing Execution of Uploaded Files
+
+### Threat Vector
+If uploaded files are stored inside a publicly served webroot or rendered inline by a browser, attackers can achieve Server-Side Code Execution (via misconfigured script interpreters) or Client-Side Stored XSS (via browser MIME sniffing or inline rendering of active content).
+
+### Implemented Defense
+- **Strict Webroot Isolation:** The storage vault (`/var/lib/sfmp_vault`) is completely outside Nginx's static serving paths and FastAPI's `StaticFiles`. No direct URL maps to any uploaded file; every byte must flow through authenticated or token-authorized FastAPI streaming endpoints.
+- **Least-Privilege OS Permissions:** Uploaded files are created with mode `0640` (non-executable) owned by a dedicated unprivileged service user (`sfmp`, UID 10001). Vault directories use `0750`. The Docker storage volume is bind-mounted with `noexec,nosuid,nodev` where supported, and containers drop all Linux capabilities with `no-new-privileges` enabled.
+- **Defensive Download Response Headers:** Every file download enforces:
+  - `Content-Disposition: attachment; filename="<sanitized>"; filename*=UTF-8''<encoded>` — forces browser download rather than inline execution/rendering.
+  - `X-Content-Type-Options: nosniff` — prevents browsers from overriding declared MIME types via content sniffing.
+  - `Content-Security-Policy: default-src 'none'; sandbox` — isolates the response in a null-origin sandbox with scripts disabled.
+  - `Cache-Control: private, no-store` — prevents intermediate proxies from caching confidential files.
+- **Reverse Proxy / API Hardening:** Nginx disables `autoindex`, hides server version tokens (`server_tokens off;`), and enforces `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and a strict global CSP. FastAPI middleware mirrors these headers for direct API access and applies a strict CORS allowlist.
+
+### Verification
+- **Test Case:** Inspected physical file permissions on the storage volume (`ls -la`) and audited HTTP download headers via `curl -I`.
+- **Expected & Observed Result:** All stored files exhibited `-rw-r-----` permissions with zero execute bits; download responses consistently delivered `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, and `Content-Security-Policy: default-src 'none'; sandbox`.
+
+---

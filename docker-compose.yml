@@ -51,6 +51,10 @@ services:
       ALLOWED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
     volumes:
       - isolated_file_vault:/var/lib/sfmp_vault
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,6 +71,8 @@ services:
       dockerfile: frontend/Dockerfile
     container_name: sfmp_frontend
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - backend
     ports:
@@ -77,9 +83,16 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  # Storage vault lives outside the webroot and is mounted with noexec,
-  # nosuid and nodev where the container runtime supports mount options.
+  # Storage vault lives outside the webroot and is bind-mounted with noexec,
+  # nosuid and nodev where the host/container runtime supports mount options.
+  # Create the host directory first (see README), or override the path with
+  # SFMP_VAULT_HOST_PATH.
   isolated_file_vault:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind,noexec,nosuid,nodev
+      device: ${SFMP_VAULT_HOST_PATH:-/var/lib/sfmp_vault}
 
 networks:
   sfmp_network:
