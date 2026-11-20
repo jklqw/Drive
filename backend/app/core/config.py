@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    COOKIE_SECURE: bool = False
 
     # Storage Vault Configuration
     STORAGE_ROOT: Path = Path("/var/lib/sfmp_vault")
