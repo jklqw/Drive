@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import List, Union
 from pydantic import field_validator
@@ -56,9 +57,18 @@ class Settings(BaseSettings):
     @field_validator("STORAGE_ROOT", mode="before")
     @classmethod
     def assemble_storage_root(cls, v: Union[str, Path]) -> Path:
-        p = Path(v)
-        # If absolute path cannot be created/accessed, resolve to local fallback
-        return p
+        p = Path(v).expanduser()
+        # An explicit environment override is always honoured (Docker mounts it).
+        if os.environ.get("STORAGE_ROOT"):
+            return p
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            if not os.access(p, os.W_OK):
+                raise OSError("storage root is not writable")
+            return p
+        except OSError:
+            # Local development fallback outside the webroot.
+            return Path(__file__).resolve().parents[3] / "storage_vault"
 
 
 settings = Settings()
