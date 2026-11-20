@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { DragDropOverlay } from '../components/files/DragDropOverlay'
 import { FileExplorer } from '../components/files/FileExplorer'
 import { FileInspectorDrawer } from '../components/files/FileInspectorDrawer'
+import { ShareModal } from '../components/sharing/ShareModal'
 import { useUploader } from '../components/files/useUploader'
 import { DriveLayout } from '../components/layout/DriveLayout'
 import type { BreadcrumbItem, FileRecord } from '../api/types'
@@ -13,6 +14,7 @@ export function DrivePage() {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [refreshKey, setRefreshKey] = useState(0)
   const [inspected, setInspected] = useState<FileRecord | null>(null)
+  const [shareFile, setShareFile] = useState<FileRecord | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const onChanged = useCallback(() => setRefreshKey((value) => value + 1), [])
@@ -40,15 +42,16 @@ export function DrivePage() {
             view={view}
             search={search}
             onInspect={setInspected}
-            onShare={() => {}}
+            onShare={setShareFile}
           />
         </div>
         <FileInspectorDrawer
           file={inspected}
           onClose={() => setInspected(null)}
-          onShare={() => {}}
+          onShare={setShareFile}
           onChanged={onChanged}
         />
+        <ShareModal file={shareFile} onClose={() => setShareFile(null)} onChanged={onChanged} />
       </div>
       <input
         ref={fileInput}

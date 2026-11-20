@@ -1,7 +1,7 @@
 import api from './client'
 import type { FileRecord } from './types'
 
-function saveBlob(blob: Blob, filename: string) {
+export function saveBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
