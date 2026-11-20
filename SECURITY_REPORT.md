@@ -75,3 +75,19 @@ If user-supplied filenames or folder paths are concatenated with a storage direc
 - **Expected & Observed Result:** Traversal characters were rejected at schema validation; storage layer confinement independently guarantees that no file operation can ever escape `/var/lib/sfmp_vault`.
 
 ---
+
+## 4. Cryptographic Randomized File Naming
+
+### Threat Vector
+Storing uploaded files under user-chosen filenames introduces multiple risks: predictable file URLs, race-condition overwrites between users, OS-specific reserved filename bugs (e.g., `CON`, `NUL`, Unicode homoglyphs), and accidental handler mapping based on file extensions on disk.
+
+### Implemented Defense
+- **Full Decoupling:** User-facing names reside strictly in PostgreSQL (`FileRecord.original_filename`). Physical files on disk are stored under server-generated cryptographic `UUIDv4` keys (122 bits of entropy) inside 2-character sharded directories (e.g., `/var/lib/sfmp_vault/9f/9f8b...`).
+- **Extensionless Storage:** Physical files are written **without any file extension**, ensuring neither the OS nor any auxiliary daemon associates an executable handler with stored blobs. The upload path independently asserts `target.suffix == ""` and refuses to overwrite an existing object key.
+- **Integrity Fingerprinting:** Every uploaded file's `SHA-256` digest is computed during streaming and stored alongside metadata for integrity verification.
+
+### Verification
+- **Test Case:** Uploaded two distinct files identically named `quarterly-report.pdf` into the same account/different folders and inspected the vault.
+- **Expected & Observed Result:** Both files stored cleanly without collision under separate extensionless UUIDv4 filenames, while downloading restored the exact original filename via HTTP headers.
+
+---

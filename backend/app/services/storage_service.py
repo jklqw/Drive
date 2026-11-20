@@ -39,6 +39,7 @@ def resolve_safe_path(storage_key: str) -> Path:
 
 
 def new_storage_key() -> str:
+    """Return a UUIDv4 object key with no extension or user-controlled text."""
     return str(uuid.uuid4())
 
 

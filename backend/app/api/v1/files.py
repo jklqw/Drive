@@ -92,8 +92,18 @@ async def upload_file(
     display_name = validated.filename
     extension = validated.extension
 
-    storage_key = new_storage_key()
-    target = resolve_safe_path(storage_key)
+    # Physical keys are server-generated UUIDv4 values with no user-controlled
+    # name or extension. Loop once more on the astronomically unlikely collision
+    # so an existing object can never be overwritten.
+    for _ in range(5):
+        storage_key = new_storage_key()
+        target = resolve_safe_path(storage_key)
+        if target.suffix or target.with_name(f".{storage_key}.part").exists():
+            continue
+        if not target.exists():
+            break
+    else:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to allocate storage key")
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(f".{storage_key}.part")
 
