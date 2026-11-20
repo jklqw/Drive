@@ -15,7 +15,11 @@ from app.db.session import get_db
 from app.models import FileRecord, Folder, User
 from app.schemas.file import FileRename, FileResponse
 from app.services.audit_service import client_ip, log_event
-from app.services.file_validator import validate_filename
+from app.services.file_validator import (
+    validate_filename,
+    validate_magic_header,
+    verify_image_structure,
+)
 from app.services.storage_service import (
     apply_file_permissions,
     delete_physical,
@@ -33,6 +37,28 @@ async def _iter_file(path) -> AsyncIterator[bytes]:
     with open(path, "rb") as handle:
         while chunk := handle.read(CHUNK_SIZE):
             yield chunk
+
+
+async def _block_upload(
+    db: AsyncSession,
+    request: Request,
+    user: User,
+    filename: str,
+    reason: str,
+    code: int = status.HTTP_400_BAD_REQUEST,
+) -> None:
+    """Audit a rejected upload, then abort with a non-leaking client error."""
+    await log_event(
+        db,
+        action="UPLOAD_BLOCKED",
+        resource_type="file",
+        user_id=user.id,
+        ip_address=client_ip(request),
+        status="DENIED",
+        details={"filename": filename[:150], "reason": reason},
+        commit=True,
+    )
+    raise HTTPException(status_code=code, detail=reason)
 
 
 @router.post("/upload", response_model=FileResponse, status_code=status.HTTP_201_CREATED)
@@ -78,6 +104,18 @@ async def upload_file(
         # before any significant amount of data is persisted.
         header = await file.read(4096)
         await file.seek(0)
+        try:
+            detected_mime = validate_magic_header(header, validated.allowed_mimes, extension)
+        except ValueError as exc:
+            await _block_upload(
+                db,
+                request,
+                user,
+                display_name,
+                str(exc),
+                code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            )
+        del header
         async with aiofiles.open(temporary, "wb") as output:
             while chunk := await file.read(CHUNK_SIZE):
                 written += len(chunk)
@@ -88,8 +126,6 @@ async def upload_file(
                     )
                 digest.update(chunk)
                 await output.write(chunk)
-        del header
-
         locked_user = await db.scalar(select(User).where(User.id == user.id).with_for_update())
         if locked_user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account unavailable")
@@ -104,13 +140,27 @@ async def upload_file(
             folder_id=folder_id,
             original_filename=display_name,
             storage_key=storage_key,
-            detected_mime_type=file.content_type or "application/octet-stream",
+            detected_mime_type=detected_mime,
             extension=extension,
             size_bytes=written,
             sha256_hash=digest.hexdigest(),
         )
         os.replace(temporary, target)
         apply_file_permissions(target)
+        if extension in {"png", "jpg", "jpeg", "webp"}:
+            try:
+                verify_image_structure(target)
+            except ValueError as exc:
+                await db.rollback()
+                target.unlink(missing_ok=True)
+                await _block_upload(
+                    db,
+                    request,
+                    user,
+                    display_name,
+                    str(exc),
+                    code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                )
 
         locked_user.storage_used_bytes += written
         db.add(record)

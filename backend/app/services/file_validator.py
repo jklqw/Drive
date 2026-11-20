@@ -9,6 +9,9 @@ import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
+import magic
+from PIL import Image, UnidentifiedImageError
+
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 MAX_DISPLAY_NAME_LENGTH = 150
 
@@ -88,3 +91,23 @@ def validate_filename(raw_filename: str) -> ValidatedUpload:
         raise ValueError(f"File type {extension} is not on the allowlist")
 
     return ValidatedUpload(filename=name, extension=extension.lstrip("."), allowed_mimes=allowed)
+
+
+def validate_magic_header(header: bytes, allowed_mimes: frozenset[str], extension: str) -> str:
+    """Inspect real binary content; never trust the client Content-Type header."""
+    if not header:
+        raise ValueError("Empty files cannot be content-verified")
+    detected = magic.from_buffer(header, mime=True).split(";", 1)[0].strip().lower()
+    if detected not in allowed_mimes:
+        expected = ", ".join(sorted(allowed_mimes))
+        raise ValueError(f"Content type {detected} does not match .{extension} (expected {expected})")
+    return detected
+
+
+def verify_image_structure(path: Path) -> None:
+    """Reject malformed or polyglot image payloads using Pillow's verifier."""
+    try:
+        with Image.open(path) as image:
+            image.verify()
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as exc:
+        raise ValueError("Image structure failed verification") from exc

@@ -42,3 +42,19 @@ Relying on a denylist (blocking `.php` or `.exe`) consistently fails against alt
 - **Expected & Observed Result:** Server rejected each payload with HTTP `400 Bad Request` before opening the upload stream, and recorded an `UPLOAD_BLOCKED` entry with the rejection reason in `audit_logs`.
 
 ---
+
+## 2. File Content & Magic-Byte MIME Validation
+
+### Threat Vector
+HTTP `Content-Type` headers and file extensions are fully attacker-controlled. An attacker can rename a PHP script or HTML/JavaScript payload to `invoice.pdf` or `avatar.png` and send `Content-Type: image/png` to bypass naive validation.
+
+### Implemented Defense
+- **Binary Header Inspection:** Rather than trusting client headers, the backend reads the initial 4,096 bytes of the uploaded byte stream and inspects the binary signature (magic bytes) via `python-magic` (`libmagic`).
+- **Extension-to-MIME Cross-Matrix:** The detected MIME type must belong to the exact set of permitted MIME types mapped to the file's claimed extension (e.g., `.pdf` must inspect strictly as `application/pdf`; `.png` must inspect as `image/png`).
+- **Structural Image Verification:** Uploaded raster images undergo structural verification via Pillow (`Image.verify()`) to reject corrupted or disguised polyglot payloads. The verified MIME type, not the client header, is persisted in `FileRecord.detected_mime_type`.
+
+### Verification
+- **Test Case:** Created a file containing `<?php echo shell_exec($_GET['cmd']); ?>`, renamed it to `photo.png`, and submitted it with header `Content-Type: image/png`.
+- **Expected & Observed Result:** `libmagic` identified the stream as `text/x-php` / `text/plain`, mismatched against `.png`'s allowed MIME (`image/png`), immediately aborted the upload with `415 Unsupported Media Type`, and logged the spoofing attempt as `UPLOAD_BLOCKED`.
+
+---
