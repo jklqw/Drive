@@ -1,7 +1,9 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import Request
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_log import AuditLog
@@ -44,3 +46,31 @@ async def log_event(
     if commit:
         await db.commit()
     return entry
+
+
+async def count_events(db: AsyncSession, actions: list[str], since: datetime) -> int:
+    """Count audit events for the given actions since a UTC timestamp."""
+    value = await db.scalar(
+        select(func.count(AuditLog.id)).where(
+            AuditLog.action.in_(actions),
+            AuditLog.created_at >= since.replace(tzinfo=None),
+        )
+    )
+    return int(value or 0)
+
+
+async def list_events(
+    db: AsyncSession,
+    *,
+    action: str | None = None,
+    status: str | None = None,
+    skip: int = 0,
+    limit: int = 50,
+) -> list[AuditLog]:
+    query = select(AuditLog)
+    if action:
+        query = query.where(AuditLog.action == action)
+    if status:
+        query = query.where(AuditLog.status == status)
+    query = query.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit)
+    return list((await db.execute(query)).scalars().all())
