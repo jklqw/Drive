@@ -58,3 +58,20 @@ HTTP `Content-Type` headers and file extensions are fully attacker-controlled. A
 - **Expected & Observed Result:** `libmagic` identified the stream as `text/x-php` / `text/plain`, mismatched against `.png`'s allowed MIME (`image/png`), immediately aborted the upload with `415 Unsupported Media Type`, and logged the spoofing attempt as `UPLOAD_BLOCKED`.
 
 ---
+
+## 3. Path Traversal Prevention
+
+### Threat Vector
+If user-supplied filenames or folder paths are concatenated with a storage directory (e.g., `uploads/ + filename`), payloads containing `../` or `..\` allow attackers to overwrite critical system files, read sensitive configuration files (`.env`), or escape their isolated storage directory.
+
+### Implemented Defense
+- **Zero User Input in Filesystem Paths:** Logical folder hierarchy exists exclusively as relational foreign keys in PostgreSQL (`Folder.parent_id`), never as OS directories.
+- **Strict Storage Key Validation:** All disk operations validate that the storage identifier strictly matches a UUIDv4 regex pattern.
+- **Canonical Path Confinement:** Every resolved disk path is verified with `resolved_path = (STORAGE_ROOT / prefix / key).resolve()` followed by an invariant check `resolved_path.is_relative_to(STORAGE_ROOT.resolve())`. Any violation raises `SecurityViolationError`, which is handled globally with a generic `400` and a `PATH_TRAVERSAL_BLOCKED` audit entry.
+- **Logical Name Hardening:** Folder and file display schemas reject control characters, `/`, `\`, `..`, drive prefixes, trailing dots/spaces, and Windows reserved device names before any persistence.
+
+### Verification
+- **Test Case:** Submitted filenames `../../../../etc/passwd`, `..%2F..%2F.env`, and `..\secret.txt` across upload and rename endpoints.
+- **Expected & Observed Result:** Traversal characters were rejected at schema validation; storage layer confinement independently guarantees that no file operation can ever escape `/var/lib/sfmp_vault`.
+
+---

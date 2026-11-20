@@ -8,6 +8,9 @@ from starlette.requests import Request
 
 from app.api.v1 import admin, auth, files, folders, shares
 from app.core.config import settings
+from app.db.session import AsyncSessionLocal
+from app.services.audit_service import client_ip, log_event
+from app.services.storage_service import SecurityViolationError
 
 
 @asynccontextmanager
@@ -47,6 +50,24 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+@app.exception_handler(SecurityViolationError)
+async def security_violation_handler(request: Request, exc: SecurityViolationError) -> JSONResponse:
+    """Fail closed and record any attempt to escape the storage vault."""
+    async with AsyncSessionLocal() as db:
+        await log_event(
+            db,
+            action="PATH_TRAVERSAL_BLOCKED",
+            resource_type="storage",
+            resource_id=request.url.path[:255],
+            ip_address=client_ip(request),
+            status="DENIED",
+            details={"reason": str(exc)},
+            commit=True,
+        )
+    return JSONResponse(status_code=400, content={"detail": "Invalid storage request"})
+
 
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(folders.router, prefix=settings.API_V1_STR)

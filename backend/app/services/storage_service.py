@@ -17,8 +17,13 @@ class SecurityViolationError(Exception):
 
 
 def get_storage_root() -> Path:
+    """Return the canonical, confined vault root (never a filesystem root)."""
     root = settings.STORAGE_ROOT.resolve()
+    if root == Path(root.anchor):
+        raise SecurityViolationError("Storage root cannot be a filesystem root")
     root.mkdir(parents=True, exist_ok=True)
+    if not root.is_dir():
+        raise SecurityViolationError("Storage root is not a directory")
     return root
 
 
