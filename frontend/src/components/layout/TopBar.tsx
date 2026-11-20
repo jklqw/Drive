@@ -3,6 +3,8 @@ import clsx from 'clsx'
 import type { BreadcrumbItem } from '../../api/types'
 
 interface TopBarProps {
+  rootLabel?: string
+  onRootNavigate?: () => void
   breadcrumbs: BreadcrumbItem[]
   onNavigate: (id: string | null) => void
   search: string
@@ -11,19 +13,28 @@ interface TopBarProps {
   onViewChange: (view: 'grid' | 'list') => void
 }
 
-export function TopBar({ breadcrumbs, onNavigate, search, onSearchChange, view, onViewChange }: TopBarProps) {
+export function TopBar({
+  rootLabel = 'My Drive',
+  onRootNavigate,
+  breadcrumbs,
+  onNavigate,
+  search,
+  onSearchChange,
+  view,
+  onViewChange,
+}: TopBarProps) {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface px-6">
       <div className="flex min-w-0 items-center gap-1.5">
         <button
           type="button"
-          onClick={() => onNavigate(null)}
+          onClick={() => (onRootNavigate ? onRootNavigate() : onNavigate(null))}
           className={clsx(
             'flex items-center gap-1.5 rounded px-1.5 py-1 text-[12.5px] transition-colors hover:bg-canvas',
             breadcrumbs.length === 0 ? 'font-medium text-ink-primary' : 'text-ink-secondary',
           )}
         >
-          <Home size={14} /> My Drive
+          <Home size={14} /> {rootLabel}
         </button>
         {breadcrumbs.map((crumb) => (
           <span key={crumb.id} className="flex min-w-0 items-center gap-1.5">

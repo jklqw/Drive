@@ -5,17 +5,21 @@ import { TopBar } from './TopBar'
 
 interface DriveLayoutProps {
   children: ReactNode
+  rootLabel?: string
+  onRootNavigate?: () => void
   breadcrumbs: BreadcrumbItem[]
   onNavigate: (id: string | null) => void
   search: string
   onSearchChange: (value: string) => void
   view: 'grid' | 'list'
   onViewChange: (view: 'grid' | 'list') => void
-  onUpload: () => void
+  onUpload?: () => void
 }
 
 export function DriveLayout({
   children,
+  rootLabel,
+  onRootNavigate,
   breadcrumbs,
   onNavigate,
   search,
@@ -29,6 +33,8 @@ export function DriveLayout({
       <Sidebar onUpload={onUpload} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
+          rootLabel={rootLabel}
+          onRootNavigate={onRootNavigate}
           breadcrumbs={breadcrumbs}
           onNavigate={onNavigate}
           search={search}

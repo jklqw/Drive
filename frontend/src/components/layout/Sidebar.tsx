@@ -14,7 +14,7 @@ import { useAuth } from '../../context/AuthContext'
 import { StorageMeter } from './StorageMeter'
 
 interface SidebarProps {
-  onUpload: () => void
+  onUpload?: () => void
 }
 
 const soon = [
@@ -44,15 +44,17 @@ export function Sidebar({ onUpload }: SidebarProps) {
         </div>
       </div>
 
-      <div className="px-4 py-4">
-        <button
-          type="button"
-          onClick={onUpload}
-          className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-brand text-[12px] font-medium text-white transition-colors hover:bg-brand-700"
-        >
-          <Plus size={15} strokeWidth={2.3} /> Upload files
-        </button>
-      </div>
+      {onUpload && (
+        <div className="px-4 py-4">
+          <button
+            type="button"
+            onClick={onUpload}
+            className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-brand text-[12px] font-medium text-white transition-colors hover:bg-brand-700"
+          >
+            <Plus size={15} strokeWidth={2.3} /> Upload files
+          </button>
+        </div>
+      )}
 
       <nav className="flex-1 space-y-0.5 px-3">
         <NavLink
