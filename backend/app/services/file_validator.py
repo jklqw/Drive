@@ -13,6 +13,10 @@ import magic
 from PIL import Image, UnidentifiedImageError
 
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
+_WINDOWS_RESERVED = re.compile(
+    r"^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?$",
+    re.IGNORECASE,
+)
 MAX_DISPLAY_NAME_LENGTH = 150
 
 # Extension -> exact MIME types libmagic is allowed to report for that extension.
@@ -79,6 +83,8 @@ def validate_filename(raw_filename: str) -> ValidatedUpload:
         raise ValueError(f"Filename exceeds {MAX_DISPLAY_NAME_LENGTH} characters")
     if "/" in name or "\\" in name:
         raise ValueError("Path separators are not allowed in filenames")
+    if _WINDOWS_RESERVED.fullmatch(name):
+        raise ValueError("Reserved device names are not allowed")
 
     suffixes = Path(name).suffixes
     if len(suffixes) != 1:
