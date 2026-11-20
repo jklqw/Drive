@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     # Storage Vault Configuration
     STORAGE_ROOT: Path = Path("/var/lib/sfmp_vault")
 
+    # Optional built frontend/website directory served by the backend for SPA routes.
+    WEBSITE_DIST_DIR: str | None = None
+
+    # Optional built frontend/website directory served by the backend for SPA routes.
+    # If unset, common locations (e.g. ../frontend/dist) are auto-detected.
+    WEBSITE_DIST_DIR: Path | None = None
+
     # Size Limits & Quotas
     MAX_FILE_SIZE_BYTES: int = 25 * 1024 * 1024  # 25 MB
     DEFAULT_USER_QUOTA_BYTES: int = 1024 * 1024 * 1024  # 1 GB

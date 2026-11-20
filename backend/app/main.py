@@ -1,8 +1,11 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -110,3 +113,50 @@ app.include_router(admin.router, prefix=settings.API_V1_STR)
 @app.get("/health", tags=["system"])
 async def health() -> JSONResponse:
     return JSONResponse({"status": "ok", "service": "secure-file-management-platform"})
+
+
+def _resolve_website_dir() -> Path | None:
+    """Locate a built frontend/website bundle to serve for SPA routes.
+
+    This is strictly separate from the isolated storage vault; user-uploaded
+    objects are never exposed as static files.
+    """
+    configured = settings.WEBSITE_DIST_DIR
+    if configured:
+        candidate = Path(configured).expanduser().resolve()
+        return candidate if (candidate / "index.html").is_file() else None
+
+    repo_root = Path(__file__).resolve().parents[2]
+    candidates = [
+        repo_root / "frontend" / "dist",
+        Path.cwd() / "frontend" / "dist",
+        Path("/app/frontend/dist"),
+    ]
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+        except OSError:
+            continue
+        if (resolved / "index.html").is_file():
+            return resolved
+    return None
+
+
+WEBSITE_DIR = _resolve_website_dir()
+if WEBSITE_DIR is not None:
+    assets_dir = WEBSITE_DIR / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="website-assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_website(full_path: str):
+        """Serve built website assets with SPA fallback, without shadowing the API."""
+        normalized = full_path.lstrip("/")
+        if normalized == "api" or normalized.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        if normalized:
+            candidate = (WEBSITE_DIR / normalized).resolve()
+            if candidate.is_file() and candidate.is_relative_to(WEBSITE_DIR):
+                return FileResponse(candidate)
+        index = WEBSITE_DIR / "index.html"
+        return FileResponse(index)

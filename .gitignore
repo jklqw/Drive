@@ -29,6 +29,9 @@ htmlcov/
 .pytest_cache/
 .ruff_cache/
 
+# TypeScript build artifacts
+*.tsbuildinfo
+
 # IDE & OS files
 .vscode/
 .idea/
