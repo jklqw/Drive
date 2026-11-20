@@ -51,10 +51,26 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["X-XSS-Protection"] = "0"
-        response.headers.setdefault(
-            "Content-Security-Policy",
-            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
-        )
+
+        if "Content-Security-Policy" not in response.headers:
+            path = request.url.path
+            api_prefix = settings.API_V1_STR.rstrip("/")
+            # Strict CSP for JSON/system API endpoints and file-streaming responses.
+            if path == "/health" or path == api_prefix or path.startswith(api_prefix + "/"):
+                response.headers["Content-Security-Policy"] = (
+                    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+                )
+            else:
+                # Website SPA, static assets, and API docs UI need script/style loading.
+                response.headers["Content-Security-Policy"] = (
+                    "default-src 'self'; "
+                    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+                    "font-src 'self' https://fonts.gstatic.com data:; "
+                    "img-src 'self' data: blob:; "
+                    "connect-src 'self'; "
+                    "frame-ancestors 'none'; base-uri 'self'"
+                )
         if settings.ENVIRONMENT == "production":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
