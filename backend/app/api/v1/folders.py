@@ -7,26 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_owned_folder
 from app.db.session import get_db
 from app.models import FileRecord, Folder, User
+from app.schemas.file import FileResponse
 from app.schemas.folder import BreadcrumbItem, ContentsResponse, FolderCreate, FolderResponse, FolderRename
 from app.services.audit_service import client_ip, log_event
 from app.services.storage_service import delete_physical
 
 router = APIRouter(prefix="/folders", tags=["folders"])
-
-
-def _file_to_dict(file: FileRecord) -> dict:
-    return {
-        "id": str(file.id),
-        "owner_id": str(file.owner_id),
-        "folder_id": str(file.folder_id) if file.folder_id else None,
-        "original_filename": file.original_filename,
-        "detected_mime_type": file.detected_mime_type,
-        "extension": file.extension,
-        "size_bytes": file.size_bytes,
-        "sha256_hash": file.sha256_hash,
-        "created_at": file.created_at.isoformat(),
-        "updated_at": file.updated_at.isoformat(),
-    }
 
 
 async def _breadcrumbs(db: AsyncSession, user: User, folder_id: uuid.UUID | None) -> list[BreadcrumbItem]:
@@ -61,7 +47,7 @@ async def _contents(db: AsyncSession, user: User, parent_id: uuid.UUID | None) -
     ).scalars().all()
     return ContentsResponse(
         folders=[FolderResponse.model_validate(folder) for folder in folders],
-        files=[_file_to_dict(file) for file in files],
+        files=[FileResponse.model_validate(file) for file in files],
         breadcrumbs=await _breadcrumbs(db, user, parent_id),
     )
 

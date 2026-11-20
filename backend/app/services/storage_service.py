@@ -1,6 +1,8 @@
 import re
+import stat
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 from app.core.config import settings
 
@@ -37,3 +39,21 @@ def new_storage_key() -> str:
 
 async def delete_physical(storage_key: str) -> None:
     resolve_safe_path(storage_key).unlink(missing_ok=True)
+
+
+def apply_file_permissions(path: Path) -> None:
+    """Owner read/write only: no execute bit for any principal."""
+    path.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)  # 0o640
+
+
+def safe_download_headers(display_name: str) -> dict[str, str]:
+    """Force download and block inline rendering / MIME sniffing."""
+    ascii_name = display_name.encode("ascii", "ignore").decode("ascii").strip() or "download"
+    ascii_name = ascii_name.replace('"', "").replace("\r", "").replace("\n", "")
+    return {
+        "Content-Disposition": f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(display_name)}',
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+        "Cache-Control": "private, no-store",
+    }
+

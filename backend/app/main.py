@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-from app.api.v1 import auth, folders
+from app.api.v1 import auth, files, folders
 from app.core.config import settings
 
 
@@ -50,6 +50,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(folders.router, prefix=settings.API_V1_STR)
+app.include_router(files.router, prefix=settings.API_V1_STR)
 
 
 @app.get("/health", tags=["system"])
