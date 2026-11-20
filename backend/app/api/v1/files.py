@@ -15,7 +15,7 @@ from app.db.session import get_db
 from app.models import FileRecord, Folder, User
 from app.schemas.file import FileRename, FileResponse
 from app.services.audit_service import client_ip, log_event
-from app.services.file_validator import extract_extension, safe_display_name
+from app.services.file_validator import validate_filename
 from app.services.storage_service import (
     apply_file_permissions,
     delete_physical,
@@ -49,10 +49,22 @@ async def upload_file(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
 
     try:
-        display_name = safe_display_name(file.filename or "")
-        extension = extract_extension(display_name)
+        validated = validate_filename(file.filename or "")
     except ValueError as exc:
+        # Block before any byte is written to disk; retain evidence for the admin console.
+        await log_event(
+            db,
+            action="UPLOAD_BLOCKED",
+            resource_type="file",
+            user_id=user.id,
+            ip_address=client_ip(request),
+            status="DENIED",
+            details={"filename": (file.filename or "")[:150], "reason": str(exc)},
+            commit=True,
+        )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    display_name = validated.filename
+    extension = validated.extension
 
     storage_key = new_storage_key()
     target = resolve_safe_path(storage_key)
