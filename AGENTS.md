@@ -36,40 +36,40 @@ Key capabilities:
 ## 3. Commit-by-Commit Roadmap & Status Checklist
 
 ### Phase 1: Repository Initialization & Scaffolding
-- [ ] **Commit 1:** `chore: initialize repository structure, gitignore, and environment template`
-- [ ] **Commit 2:** `chore(backend): configure FastAPI dependencies, requirements.txt, and settings`
-- [ ] **Commit 3:** `chore(frontend): scaffold React TypeScript workspace with Tailwind CSS`
-- [ ] **Commit 4:** `chore(infra): add Docker Compose for PostgreSQL, Redis, and isolated storage volume`
+- [x] **Commit 1:** `chore: initialize repository structure, gitignore, and environment template`
+- [x] **Commit 2:** `chore(backend): configure FastAPI dependencies, requirements.txt, and settings`
+- [x] **Commit 3:** `chore(frontend): scaffold React TypeScript workspace with Tailwind CSS`
+- [x] **Commit 4:** `chore(infra): add Docker Compose for PostgreSQL, Redis, and isolated storage volume`
 
 ### Phase 2: Database Modeling & Authentication
-- [ ] **Commit 5:** `feat(db): design async SQLAlchemy models and initial Alembic migration`
-- [ ] **Commit 6:** `feat(auth): implement Argon2id hashing, JWT sessions, and HttpOnly refresh cookies`
-- [ ] **Commit 7:** `ui(auth): build clean login and registration pages with token refresh interceptor`
+- [x] **Commit 5:** `feat(db): design async SQLAlchemy models and initial Alembic migration`
+- [x] **Commit 6:** `feat(auth): implement Argon2id hashing, JWT sessions, and HttpOnly refresh cookies`
+- [x] **Commit 7:** `ui(auth): build clean login and registration pages with token refresh interceptor`
 
 ### Phase 3: Core Cloud Drive Engine
-- [ ] **Commit 8:** `feat(folders): implement hierarchical folder CRUD, breadcrumbs, and recursive delete`
-- [ ] **Commit 9:** `feat(files): implement chunked file upload, streaming download, rename, and delete`
-- [ ] **Commit 10:** `feat(sharing): add expiring tokenized file sharing with hashed tokens and download caps`
-- [ ] **Commit 11:** `feat(admin): add admin dashboard API for user quotas, storage metrics, and audit logs`
+- [x] **Commit 8:** `feat(folders): implement hierarchical folder CRUD, breadcrumbs, and recursive delete`
+- [x] **Commit 9:** `feat(files): implement chunked file upload, streaming download, rename, and delete`
+- [x] **Commit 10:** `feat(sharing): add expiring tokenized file sharing with hashed tokens and download caps`
+- [x] **Commit 11:** `feat(admin): add admin dashboard API for user quotas, storage metrics, and audit logs`
 
 ### Phase 4: Handcrafted Modern Frontend
-- [ ] **Commit 12:** `ui(layout): build refined SaaS workspace shell with sidebar and storage quota meter`
-- [ ] **Commit 13:** `ui(files): implement drag-and-drop uploader, grid/list file explorer, and inspector drawer`
-- [ ] **Commit 14:** `ui(sharing): add share link management modal and clean public download view`
-- [ ] **Commit 15:** `ui(admin): build admin console for storage analytics, user quotas, and security logs`
+- [x] **Commit 12:** `ui(layout): build refined SaaS workspace shell with sidebar and storage quota meter`
+- [x] **Commit 13:** `ui(files): implement drag-and-drop uploader, grid/list file explorer, and inspector drawer`
+- [x] **Commit 14:** `ui(sharing): add share link management modal and clean public download view`
+- [x] **Commit 15:** `ui(admin): build admin console for storage analytics, user quotas, and security logs`
 
 ### Phase 5: Security Hardening (Dedicated Commits + SECURITY_REPORT.md Updates)
-- [ ] **Commit 16:** `sec(upload): enforce strict file extension allowlist and filename sanitization` (Control #1)
-- [ ] **Commit 17:** `sec(validation): implement magic-byte MIME content verification with python-magic` (Control #2)
-- [ ] **Commit 18:** `sec(storage): prevent path traversal via canonical path confinement and strict key regex` (Control #3)
-- [ ] **Commit 19:** `sec(storage): decouple display names using extensionless UUIDv4 randomized filenames` (Control #4)
-- [ ] **Commit 20:** `sec(access-control): enforce strict object-level ownership guards across all endpoints` (Control #5)
-- [ ] **Commit 21:** `sec(dos): enforce streaming file size caps, atomic quotas, and Redis rate limiting` (Control #6)
-- [ ] **Commit 22:** `sec(execution): harden storage isolation, permissions, CSP sandbox, and download headers` (Control #7)
+- [x] **Commit 16:** `sec(upload): enforce strict file extension allowlist and filename sanitization` (Control #1)
+- [x] **Commit 17:** `sec(validation): implement magic-byte MIME content verification with python-magic` (Control #2)
+- [x] **Commit 18:** `sec(storage): prevent path traversal via canonical path confinement and strict key regex` (Control #3)
+- [x] **Commit 19:** `sec(storage): decouple display names using extensionless UUIDv4 randomized filenames` (Control #4)
+- [x] **Commit 20:** `sec(access-control): enforce strict object-level ownership guards across all endpoints` (Control #5)
+- [x] **Commit 21:** `sec(dos): enforce streaming file size caps, atomic quotas, and Redis rate limiting` (Control #6)
+- [x] **Commit 22:** `sec(execution): harden storage isolation, permissions, CSP sandbox, and download headers` (Control #7)
 
 ### Phase 6: Security Testing & Portfolio Polish
-- [ ] **Commit 23:** `test(security): add automated pytest suite covering all 7 security controls and CI workflow`
-- [ ] **Commit 24:** `docs: add polished GitHub README with architecture, security overview, and screenshots`
+- [x] **Commit 23:** `test(security): add automated pytest suite covering all 7 security controls and CI workflow`
+- [x] **Commit 24:** `docs: add polished GitHub README with architecture, security overview, and screenshots`
 
 ---
 
