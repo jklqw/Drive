@@ -1,0 +1,86 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sfmp_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sfmp_db
+      POSTGRES_USER: sfmp_user
+      POSTGRES_PASSWORD: sfmp_dev_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sfmp_user -d sfmp_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - sfmp_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: sfmp_redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "redis_dev_password", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a redis_dev_password ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - sfmp_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sfmp_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://sfmp_user:sfmp_dev_password@postgres:5432/sfmp_db
+      REDIS_URL: redis://:redis_dev_password@redis:6379/0
+      STORAGE_ROOT: /var/lib/sfmp_vault
+      ALLOWED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+    volumes:
+      - isolated_file_vault:/var/lib/sfmp_vault
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    networks:
+      - sfmp_network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: sfmp_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:8080"
+    networks:
+      - sfmp_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  # Storage vault lives outside the webroot and is mounted with noexec,
+  # nosuid and nodev where the container runtime supports mount options.
+  isolated_file_vault:
+
+networks:
+  sfmp_network:
+    driver: bridge
