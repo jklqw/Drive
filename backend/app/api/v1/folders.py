@@ -169,7 +169,9 @@ async def delete_folder(
     ).scalars().all()
     reclaimed = sum(file.size_bytes for file in files)
 
-    locked_user = await db.scalar(select(User).where(User.id == user.id).with_for_update())
+    locked_user = await db.scalar(
+        select(User).where(User.id == user.id).with_for_update().execution_options(populate_existing=True)
+    )
     if locked_user is not None:
         locked_user.storage_used_bytes = max(0, locked_user.storage_used_bytes - reclaimed)
 

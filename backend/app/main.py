@@ -3,11 +3,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
 from app.api.v1 import admin, auth, files, folders, shares
 from app.core.config import settings
+from app.core.limiter import limiter
 from app.db.session import AsyncSessionLocal
 from app.services.audit_service import client_ip, log_event
 from app.services.storage_service import SecurityViolationError
@@ -27,6 +29,8 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
 
 app.add_middleware(
     CORSMiddleware,
@@ -67,6 +71,29 @@ async def security_violation_handler(request: Request, exc: SecurityViolationErr
             commit=True,
         )
     return JSONResponse(status_code=400, content={"detail": "Invalid storage request"})
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    """Return a uniform 429 and retain an auditable abuse signal."""
+    async with AsyncSessionLocal() as db:
+        await log_event(
+            db,
+            action="RATE_LIMIT_EXCEEDED",
+            resource_type="endpoint",
+            resource_id=request.url.path[:255],
+            ip_address=client_ip(request),
+            status="DENIED",
+            details={"limit": str(exc.detail)},
+            commit=True,
+        )
+    detail = str(exc.detail).lower()
+    retry_after = "3600" if "/hour" in detail else "60"
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Rate limit exceeded"},
+        headers={"Retry-After": retry_after},
+    )
 
 
 app.include_router(auth.router, prefix=settings.API_V1_STR)

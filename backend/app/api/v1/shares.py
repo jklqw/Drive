@@ -7,6 +7,7 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_owned_file, get_owned_share
+from app.core.limiter import limiter
 from app.core.security import generate_share_token, sha256_token
 from app.db.session import get_db
 from app.models import FileRecord, ShareLink, User
@@ -139,8 +140,10 @@ async def revoke_share(
 
 
 @router.get("/public/share/{raw_token}", response_model=PublicShareInfo)
+@limiter.limit("30/minute")
 async def public_share_info(
     raw_token: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> PublicShareInfo:
     share = await _validate_active_share(db, raw_token)
@@ -159,6 +162,7 @@ async def public_share_info(
 
 
 @router.get("/public/share/{raw_token}/download")
+@limiter.limit("30/minute")
 async def public_share_download(
     raw_token: str,
     request: Request,

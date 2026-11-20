@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_owned_file
 from app.core.config import settings
+from app.core.limiter import limiter, user_key
 from app.db.session import get_db
 from app.models import FileRecord, Folder, User
 from app.schemas.file import FileRename, FileResponse
@@ -46,11 +47,12 @@ async def _block_upload(
     filename: str,
     reason: str,
     code: int = status.HTTP_400_BAD_REQUEST,
+    action: str = "UPLOAD_BLOCKED",
 ) -> None:
     """Audit a rejected upload, then abort with a non-leaking client error."""
     await log_event(
         db,
-        action="UPLOAD_BLOCKED",
+        action=action,
         resource_type="file",
         user_id=user.id,
         ip_address=client_ip(request),
@@ -62,6 +64,8 @@ async def _block_upload(
 
 
 @router.post("/upload", response_model=FileResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("15/minute", key_func=user_key)
+@limiter.limit("100/hour", key_func=user_key)
 async def upload_file(
     request: Request,
     file: UploadFile = File(...),
@@ -130,19 +134,33 @@ async def upload_file(
             while chunk := await file.read(CHUNK_SIZE):
                 written += len(chunk)
                 if written > settings.MAX_FILE_SIZE_BYTES:
-                    raise HTTPException(
-                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                        detail="File exceeds the maximum allowed size",
+                    await _block_upload(
+                        db,
+                        request,
+                        user,
+                        display_name,
+                        "File exceeds the maximum allowed size",
+                        code=status.HTTP_413_CONTENT_TOO_LARGE,
                     )
                 digest.update(chunk)
                 await output.write(chunk)
-        locked_user = await db.scalar(select(User).where(User.id == user.id).with_for_update())
+        locked_user = await db.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
         if locked_user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account unavailable")
         if locked_user.storage_used_bytes + written > locked_user.storage_quota_bytes:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="Storage quota exceeded",
+            await _block_upload(
+                db,
+                request,
+                user,
+                display_name,
+                "Storage quota exceeded",
+                code=status.HTTP_413_CONTENT_TOO_LARGE,
+                action="QUOTA_EXCEEDED",
             )
 
         record = FileRecord(
@@ -251,7 +269,9 @@ async def delete_file(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    locked_user = await db.scalar(select(User).where(User.id == user.id).with_for_update())
+    locked_user = await db.scalar(
+        select(User).where(User.id == user.id).with_for_update().execution_options(populate_existing=True)
+    )
     if locked_user is not None:
         locked_user.storage_used_bytes = max(0, locked_user.storage_used_bytes - record.size_bytes)
 

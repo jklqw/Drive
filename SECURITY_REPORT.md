@@ -108,3 +108,24 @@ Insecure Direct Object Reference (IDOR / OWASP API1) occurs when an authenticate
 - **Expected & Observed Result:** Every request returned `404` with zero data disclosure, and each unauthorized probe was captured in the admin audit trail.
 
 ---
+
+## 6. Upload Size Limits, Atomic Quotas & Rate Limiting
+
+### Threat Vector
+Without strict resource bounds, malicious or compromised accounts can exhaust server RAM, fill disk partitions (Denial of Service), or brute-force authentication and public share endpoints.
+
+### Implemented Defense
+- **Multi-Layer Size Enforcement:**
+  1. *Reverse Proxy Layer:* Nginx enforces `client_max_body_size 25M;` to reject oversized requests at the network edge.
+  2. *Application Streaming Layer:* FastAPI streams uploads in 64KB chunks and maintains an exact byte counter independent of the spoofable `Content-Length` header. If the stream exceeds `MAX_FILE_SIZE_BYTES`, streaming halts immediately and the partial temporary file is unlinked.
+- **Atomic User Storage Quotas:** Before committing a file, the database acquires a row-level lock (`SELECT ... FOR UPDATE` with `populate_existing`) on the user record to prevent concurrent upload race conditions from bypassing `storage_quota_bytes`.
+- **Redis-Backed Rate Limiting:** Implemented via `SlowAPI` + Redis, with an in-memory fallback so a brief Redis outage never fails open:
+  - Login attempts: `5 requests / minute` per IP.
+  - File uploads: `15 requests / minute` and `100 requests / hour` per authenticated user.
+  - Public share lookups: `30 requests / minute` per IP.
+
+### Verification
+- **Test Case:** (a) Streamed an oversized binary file; (b) attempted uploading a file exceeding remaining user quota; (c) dispatched rapid authentication requests within one minute.
+- **Expected & Observed Result:** (a) Rejected with `413 Payload Too Large` with zero residual temp files; (b) rejected with `413 Quota Exceeded` and a `QUOTA_EXCEEDED` audit entry; (c) requests beyond threshold returned `429 Too Many Requests` with a `Retry-After` header and a `RATE_LIMIT_EXCEEDED` audit entry.
+
+---
