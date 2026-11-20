@@ -91,3 +91,20 @@ Storing uploaded files under user-chosen filenames introduces multiple risks: pr
 - **Expected & Observed Result:** Both files stored cleanly without collision under separate extensionless UUIDv4 filenames, while downloading restored the exact original filename via HTTP headers.
 
 ---
+
+## 5. Preventing Unauthorized Cross-User File Access (Anti-IDOR)
+
+### Threat Vector
+Insecure Direct Object Reference (IDOR / OWASP API1) occurs when an authenticated user modifies a resource identifier (`file_id`, `folder_id`, or `share_id`) in an API request to read, download, rename, share, or delete another user's private files.
+
+### Implemented Defense
+- **Non-Sequential Identifiers:** All primary keys (`User`, `Folder`, `FileRecord`, `ShareLink`) use `UUIDv4` rather than auto-incrementing integers, preventing blind enumeration.
+- **Mandatory Ownership Scoped Queries:** Every single file and folder endpoint injects a FastAPI authorization dependency (`get_owned_file`, `get_owned_folder`, `get_owned_share`) that derives `user_id` exclusively from the cryptographically verified JWT and queries `WHERE id = :resource_id AND owner_id = :current_user_id`.
+- **Non-Leaking Error Responses:** Unauthorized access attempts return `404 Not Found` (preventing attackers from probing whether a given UUID belongs to another tenant) while recording an internal `ACCESS_DENIED` event in `audit_logs`. Non-admin access to the admin console is audited as well.
+- **Token-Hashed Public Shares:** Public access is permitted *only* via `/api/v1/public/share/{token}`, where the presented 256-bit token is SHA-256 hashed and checked against expiry, revocation, and download caps.
+
+### Verification
+- **Test Case:** Created User A and User B. User A uploaded a private file (`file_id_A`). Authenticated as User B, attempted `GET /download`, `PATCH /rename`, `POST /share`, and `DELETE` against `file_id_A`.
+- **Expected & Observed Result:** Every request returned `404` with zero data disclosure, and each unauthorized probe was captured in the admin audit trail.
+
+---

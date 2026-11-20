@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import decode_token
 from app.core.token_store import token_store
 from app.db.session import get_db
-from app.models import FileRecord, Folder, User, UserRole
+from app.models import FileRecord, Folder, ShareLink, User, UserRole
 from app.services.audit_service import client_ip, log_event
 
 _bearer = HTTPBearer(auto_error=False)
@@ -53,8 +53,23 @@ async def get_current_user(
     return user
 
 
-async def require_admin(user: User = Depends(get_current_user)) -> User:
+async def require_admin(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
     if user.role != UserRole.ADMIN:
+        await log_event(
+            db,
+            action="ACCESS_DENIED",
+            resource_type="admin_console",
+            resource_id=request.url.path[:255],
+            user_id=user.id,
+            ip_address=client_ip(request),
+            status="DENIED",
+            details={"reason": "administrator role required"},
+            commit=True,
+        )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator access required")
     return user
 
@@ -108,3 +123,29 @@ async def get_owned_folder(
         )
         raise NOT_FOUND
     return folder
+
+
+async def get_owned_share(
+    share_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ShareLink:
+    """Reusable object-level guard for every share-management operation."""
+    share = await db.scalar(
+        select(ShareLink).where(ShareLink.id == share_id, ShareLink.created_by == user.id)
+    )
+    if share is None:
+        await log_event(
+            db,
+            action="ACCESS_DENIED",
+            resource_type="share",
+            resource_id=str(share_id),
+            user_id=user.id,
+            ip_address=client_ip(request),
+            status="DENIED",
+            details={"reason": "object not owned by requester"},
+            commit=True,
+        )
+        raise NOT_FOUND
+    return share

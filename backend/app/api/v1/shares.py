@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime, timedelta, timezone
 from typing import AsyncIterator
 
@@ -7,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_owned_file
+from app.api.deps import get_current_user, get_owned_file, get_owned_share
 from app.core.security import generate_share_token, sha256_token
 from app.db.session import get_db
 from app.models import FileRecord, ShareLink, User
@@ -121,16 +120,11 @@ async def list_shares(
 
 @router.delete("/shares/{share_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_share(
-    share_id: uuid.UUID,
     request: Request,
+    share: ShareLink = Depends(get_owned_share),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    share = await db.scalar(
-        select(ShareLink).where(ShareLink.id == share_id, ShareLink.created_by == user.id)
-    )
-    if share is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Share link not found")
     share.is_revoked = True
     await log_event(
         db,
